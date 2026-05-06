@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -144,12 +144,12 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
 
 CACHE_MAX_ENTRIES_LARGE = 2
 CACHE_MAX_ENTRIES_MEDIUM = 4
-CACHE_MAX_ENTRIES_VIEW = 6
+CACHE_MAX_ENTRIES_VIEW = 4
 CACHE_MAX_ENTRIES_FILTERS = 2
 CACHE_SESSION_VARIATIONS = 1
-SESSION_CACHE_MAX_TEXT_CHARS = 320_000
-SESSION_CACHE_MAX_CONTAINER_ITEMS = 8
-SESSION_CACHE_TTL_SECONDS = 1800
+SESSION_CACHE_MAX_TEXT_CHARS = 220_000
+SESSION_CACHE_MAX_CONTAINER_ITEMS = 6
+SESSION_CACHE_TTL_SECONDS = 900
 COTACOES_CACHE_VERSION = "2026-04-02-cotacoes-otimizadas-v7"
 ALLOWED_CANAIS_VENDA_COTACOES = {
     normalizar_chave_visual("CORPPME"),
@@ -567,10 +567,11 @@ st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
 KPI_PILL_VARIANT = "contrast"  # Opcoes: "clean" ou "contrast"
 
 DASHBOARD_APP_DIR = Path(__file__).resolve().parent
+DASHBOARD_PROJECT_ROOT = DASHBOARD_APP_DIR.parent
 DASHBOARD_FILES_DIR_PROD = Path(
     r""
 )
-DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / ""
+DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_PROJECT_ROOT
 DASHBOARD_FILES_DIR = (
     DASHBOARD_FILES_DIR_PROD
     if DASHBOARD_FILES_DIR_PROD.exists()
@@ -583,6 +584,7 @@ DASHBOARD_FILE_SEARCH_DIRS = (
     DASHBOARD_FILES_DIR,
     DASHBOARD_FILES_DIR_LOCAL,
     DASHBOARD_FILES_DIR_PROD,
+    DASHBOARD_PROJECT_ROOT,
     DASHBOARD_APP_DIR,
 )
 
@@ -616,7 +618,7 @@ def resolver_arquivo_dashboard(nome_arquivo: str | Path, *fallbacks: str | Path)
     return candidatos[0] if candidatos else Path(nome_arquivo)
 
 
-DASHBOARD_PREPROCESSED_SUBDIR = Path("dados_preprocessados")
+DASHBOARD_PREPROCESSED_SUBDIR = DASHBOARD_PROJECT_ROOT / "dados_preprocessados"
 
 
 def resolver_arquivo_preprocessado(nome_arquivo: str | Path, *fallbacks: str | Path) -> Path:
@@ -5052,7 +5054,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, ttl=1800)
 def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """
     Carrega e pré-trata a base principal.
@@ -5148,7 +5150,7 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, ttl=1800)
 def load_excel_cached(
     path: str,
     file_mtime: float | None = None,
@@ -5185,7 +5187,7 @@ def _resolver_primeiro_arquivo_existente(*candidatos: str | Path) -> Path:
     return resolver_arquivo_dashboard(candidatos[0], *candidatos[1:]) if candidatos else DASHBOARD_APP_DIR
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, ttl=1800)
 def load_tabular_cached(
     path: str,
     file_mtime: float | None = None,
@@ -5327,7 +5329,7 @@ def _normalizar_produto_convergencia(valor) -> str:
     return texto
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_convergencia_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base de convergência, mantendo apenas campos usados nos KPIs/tabela."""
     _ = file_mtime
@@ -5406,7 +5408,12 @@ def load_convergencia_data(path: str, file_mtime: float | None = None) -> pd.Dat
         if coluna not in df.columns:
             df[coluna] = ""
 
-    df['DATA_DIA'] = pd.to_datetime(df['DAT_MOVIMENTO'], errors='coerce', dayfirst=True).dt.normalize()
+    df['DATA_DIA'] = pd.to_datetime(
+        df['DAT_MOVIMENTO'],
+        errors='coerce',
+        dayfirst=True,
+        format='mixed'
+    ).dt.normalize()
     df = df[df['DATA_DIA'].notna()].copy()
     if df.empty:
         return pd.DataFrame()
@@ -5768,7 +5775,7 @@ def montar_tabela_convergencia_canal_html(
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_ativados_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df = _carregar_dataframe_preprocessado(
         path,
@@ -5785,7 +5792,7 @@ def load_ativados_dashboard_data(path: str, file_mtime: float | None = None) -> 
     return df
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_base_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5807,7 +5814,7 @@ def load_base_performance_data(path: str, file_mtime: float | None = None) -> pd
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5829,7 +5836,7 @@ def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_home_analitica_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5850,12 +5857,12 @@ def load_home_analitica_mensal_data(path: str, file_mtime: float | None = None) 
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_home_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return load_analitica_diaria_data(path, file_mtime)
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_ligacoes_mensal_agregado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5867,12 +5874,12 @@ def load_ligacoes_mensal_agregado_data(path: str, file_mtime: float | None = Non
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return load_base_performance_data(path, file_mtime)
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df_evolucao = _carregar_dataframe_preprocessado(
         path,
@@ -5908,7 +5915,7 @@ def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.
     return df_evolucao
 
 
-@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=6, ttl=1800)
 def load_evolucao_mensal(
     path: str,
     file_mtime: float | None,
@@ -5952,7 +5959,7 @@ def load_evolucao_mensal(
     return df.loc[mask].copy(deep=False)
 
 
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, ttl=1800)
 def load_desativados_base_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df = _carregar_dataframe_preprocessado(
         path,
@@ -9138,7 +9145,7 @@ def _formatar_mom_migracoes(valor: float | int | None) -> str:
     return f"{seta} {valor_float:+.1f}%".replace(".", ",")
 
 def obter_meses_mom_migracoes(df_migracoes: pd.DataFrame) -> tuple[list[str], str]:
-    """Retorna meses reais + proximo mes de tendencia para o filtro de MoM."""
+    """Retorna meses reais e marca o ultimo mes carregado como tendencia."""
     if df_migracoes is None or df_migracoes.empty or "MES_ANO" not in df_migracoes.columns:
         return [], ""
 
@@ -9149,16 +9156,8 @@ def obter_meses_mom_migracoes(df_migracoes: pd.DataFrame) -> tuple[list[str], st
     if not meses_reais:
         return [], ""
 
-    try:
-        data_tend = pd.Timestamp(mes_ano_para_data(meses_reais[-1])) + pd.DateOffset(months=1)
-        mes_tendencia = _formatar_mes_ano_backlog(data_tend)
-    except Exception:
-        mes_tendencia = ""
-
-    meses_opcoes = meses_reais.copy()
-    if mes_tendencia and mes_tendencia not in meses_opcoes:
-        meses_opcoes.append(mes_tendencia)
-    return meses_opcoes, str(mes_tendencia or "")
+    mes_tendencia = str(meses_reais[-1]).strip().lower()
+    return meses_reais, mes_tendencia
 
 def montar_tabela_migracoes_pme_regionais(
     df_migracoes: pd.DataFrame,
@@ -9190,20 +9189,33 @@ def montar_tabela_migracoes_pme_regionais(
         return pd.DataFrame(columns=["REGIONAL", *meses_ordem]), pd.DataFrame(columns=["REGIONAL", *meses_ordem])
 
     try:
-        data_ref_ult_mes = pd.Timestamp(mes_ano_para_data(meses_ordem[-1]))
-        data_ref_tend = data_ref_ult_mes + pd.DateOffset(months=1)
+        mes_tendencia_base = str(meses_ordem[-1]).strip().lower()
+        data_ref_tend = pd.Timestamp(mes_ano_para_data(mes_tendencia_base)).normalize()
         coluna_tendencia = f"TEND. {_formatar_mes_ano_backlog(data_ref_tend)}"
     except Exception:
-        coluna_tendencia = "TEND."
+        mes_tendencia_base = str(meses_ordem[-1]).strip().lower()
+        data_ref_tend = pd.Timestamp(mes_ano_para_data(meses_ordem[-1])).normalize()
+        coluna_tendencia = f"TEND. {str(meses_ordem[-1]).strip()}"
+
+    meses_historico_tendencia = [
+        mes for mes in meses_ordem
+        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() < data_ref_tend
+    ]
+    if not meses_historico_tendencia:
+        meses_historico_tendencia = meses_ordem.copy()
 
     tabela[coluna_tendencia] = [
         _prever_tendencia_mensal_migracoes(
-            pd.to_numeric(tabela.loc[regional, meses_ordem], errors="coerce").fillna(0.0)
+            pd.to_numeric(tabela.loc[regional, meses_historico_tendencia], errors="coerce").fillna(0.0)
         )
         for regional in tabela.index
     ]
 
-    colunas_valor = [*meses_ordem, coluna_tendencia]
+    meses_valor_reais = [
+        mes for mes in meses_ordem
+        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() < data_ref_tend
+    ]
+    colunas_valor = [*meses_valor_reais, coluna_tendencia]
     coluna_mom_ref = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_ref)
     mes_mom_base = str(coluna_mom_ref).replace("TEND.", "").strip()
     mes_mom_anterior = get_mes_anterior(mes_mom_base)
@@ -9215,10 +9227,16 @@ def montar_tabela_migracoes_pme_regionais(
     except Exception:
         data_mom_ref = pd.Timestamp(mes_ano_para_data(meses_ordem[-1])).normalize()
     eh_coluna_tendencia = str(coluna_mom_ref).strip().upper().startswith("TEND.")
-    meses_exibicao = [
-        mes for mes in meses_ordem
-        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() <= data_mom_ref
-    ]
+    if eh_coluna_tendencia:
+        meses_exibicao = [
+            mes for mes in meses_ordem
+            if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() < data_mom_ref
+        ]
+    else:
+        meses_exibicao = [
+            mes for mes in meses_ordem
+            if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() <= data_mom_ref
+        ]
     if not meses_exibicao:
         meses_exibicao = [meses_ordem[0]]
     colunas_exibicao_valor = meses_exibicao.copy()
@@ -12065,7 +12083,7 @@ def normalizar_rotulo_produto(valor) -> str:
     return base
 
 
-@st.cache_data(show_spinner=False, max_entries=4, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=4, ttl=1800)
 def cached_fig_linhas_json(
     df_json: str,
     altura: int,
@@ -12104,7 +12122,7 @@ def cached_fig_linhas_json(
     return fig.to_json()
 
 
-@st.cache_data(show_spinner=False, max_entries=4, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=4, ttl=1800)
 def cached_fig_bar_resumo_json(
     df_json: str,
     altura: int,
@@ -14650,9 +14668,10 @@ def _colunas_tabela_resultado_canais(
     produto_label = str(produto_ref or "").strip().upper()
     if produto_label not in {"CONTA", "FIXA"}:
         produto_label = "CANAL_PLAN"
+    mes_yoy_label = str(get_mes_ano_anterior(mes_ref)).strip().upper()
     return [
         produto_label,
-        'M-12',
+        mes_yoy_label,
         str(mes_m2).strip().upper(),
         str(mes_m1).strip().upper(),
         str(mes_ref).strip().upper(),
@@ -15073,7 +15092,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     return html
 
 
-@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, ttl=1800)
 def cached_tabela_html_funil_cotacoes(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_funil_cotacoes(
         desserializar_dataframe_cache(df_fmt_json),
@@ -15082,7 +15101,7 @@ def cached_tabela_html_funil_cotacoes(df_fmt_json: str, df_num_json: str, table_
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, ttl=1800)
 def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_analitica(
         desserializar_dataframe_cache(df_fmt_json),
@@ -15091,7 +15110,7 @@ def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: s
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, ttl=1800)
 def cached_tabela_html_resultado_canais(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_resultado_canais(
         desserializar_dataframe_cache(df_fmt_json),
@@ -17195,10 +17214,15 @@ def render_bloco_migracoes_pme() -> None:
         col_mig_mes_mom, col_mig_mes_spacer = st.columns([0.85, 2.65], gap="medium")
         with col_mig_mes_mom:
             render_filter_label("Mês MoM")
+            indice_mes_tend_migracoes = (
+                opcoes_mes_mom_migracoes.index(mes_tend_migracoes)
+                if mes_tend_migracoes in opcoes_mes_mom_migracoes
+                else max(len(opcoes_mes_mom_migracoes) - 1, 0)
+            )
             mes_migracoes_mom_ref = st.selectbox(
                 "Selecione o mês de referência do MoM de Migrações PME",
                 options=opcoes_mes_mom_migracoes,
-                index=max(len(opcoes_mes_mom_migracoes) - 1, 0),
+                index=indice_mes_tend_migracoes,
                 key="funil_movel_migracoes_pme_mes_mom",
                 label_visibility="collapsed",
                 format_func=lambda mes: (
@@ -17611,159 +17635,93 @@ st.markdown("""
 
 home_inicio_ctx: dict[str, object] = {}
 labels_abas_dashboard = [
-    "INÍCIO",
+    "INICIO",
     "ATIVADOS",
     "PEDIDOS",
-    "LIGAÇÕES",
-    "FUNIL MÓVEL",
-    "DESATIVAÇÕES"
+    "LIGACOES",
+    "FUNIL_MOVEL",
+    "DESATIVACOES",
 ]
-try:
-    tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
-        labels_abas_dashboard,
-        default="INÍCIO",
-        key="dashboard_tab_ativa",
-        on_change="rerun"
-    )
-except TypeError:
-    try:
-        tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
-            labels_abas_dashboard,
-            key="dashboard_tab_ativa",
-            on_change="rerun"
-        )
-    except TypeError:
-        tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(labels_abas_dashboard)
+st.markdown("""
+<style>
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 0.45rem !important;
+    margin: 0.25rem 0 1.1rem 0 !important;
+}
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] label {
+    min-height: 3rem !important;
+    border: 1px solid rgba(121, 14, 9, 0.14) !important;
+    border-radius: 999px !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
+    box-shadow: 0 0.45rem 1rem rgba(121, 14, 9, 0.08), inset 0 1px 0 rgba(255,255,255,0.92) !important;
+    justify-content: center !important;
+    padding: 0.35rem 0.55rem !important;
+}
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] label:has(input:checked) {
+    border-color: rgba(121, 14, 9, 0.55) !important;
+    background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 0.7rem 1.35rem rgba(121, 14, 9, 0.22) !important;
+}
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] label:has(input:checked) p,
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] label:has(input:checked) span {
+    color: #FFFFFF !important;
+}
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] input {
+    display: none !important;
+}
+div.st-key-dashboard_tab_ativa div[role="radiogroup"] p {
+    font-weight: 800 !important;
+    font-size: clamp(0.72rem, 0.86vw, 0.86rem) !important;
+    color: #790E09 !important;
+    white-space: nowrap !important;
+}
+@media (max-width: 900px) {
+    div.st-key-dashboard_tab_ativa div[role="radiogroup"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
 
-def _tab_deve_renderizar(tab) -> bool:
-    estado_aberto = getattr(tab, "open", None)
-    return True if estado_aberto is None else bool(estado_aberto)
+_label_abas_display = {
+    "INICIO": "INÍCIO",
+    "ATIVADOS": "ATIVADOS",
+    "PEDIDOS": "E-COMMERCE",
+    "LIGACOES": "TELEVENDAS",
+    "FUNIL_MOVEL": "EM CONSTRUÇÃO",
+    "DESATIVACOES": "DESATIVAÇÕES",
+}
 
-tab_inicio_ativa = _tab_deve_renderizar(tab0)
-tab_ativados_ativa = _tab_deve_renderizar(tab1)
-tab_desativacoes_ativa = _tab_deve_renderizar(tab2)
-tab_pedidos_ativa = _tab_deve_renderizar(tab3)
-tab_ligacoes_ativa = _tab_deve_renderizar(tab4)
-tab_funil_movel_ativa = _tab_deve_renderizar(tab5)
+_aba_padrao_dashboard = st.session_state.get("dashboard_tab_ativa", "INICIO")
+if _aba_padrao_dashboard not in labels_abas_dashboard:
+    _aba_padrao_dashboard = "INICIO"
 
-components.html(
-    """
-    <script>
-    (function() {
-      const KEY = "dashboard_tab_ativa";
-      const doc = window.parent.document;
-      const DISPLAY_LABELS = {
-        PEDIDOS: "E-COMMERCE",
-        LIGACOES: "TELEVENDAS",
-        "FUNIL MOVEL": "EM CONSTRUÇÃO"
-      };
-      const TAB_ICONS = {
-        INICIO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg>`,
-        ATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"></rect><path d="M11 18.5h2"></path></svg>`,
-        DESATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
-        DESATIVACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
-        PEDIDOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
-        "E COMMERCE": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
-        LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
-        TELEVENDAS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
-        ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`,
-        "FUNIL MOVEL": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"></path><path d="M6.5 10h11"></path><path d="M9 15h6"></path><path d="M11 20h2"></path></svg>`,
-        "EM CONSTRUCAO": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"></path><path d="M6.5 10h11"></path><path d="M9 15h6"></path><path d="M11 20h2"></path></svg>`,
-        COTACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
-        COTACAO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
-        "FUNIL FIXA": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`
-      };
-
-      function normalizeTabLabel(value) {
-        return String(value || "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-zA-Z0-9]+/g, " ")
-          .trim()
-          .toUpperCase();
-      }
-
-      function getTabs() {
-        const tabList = doc.querySelector('div[data-baseweb="tab-list"]');
-        if (!tabList) return [];
-        return Array.from(tabList.querySelectorAll('button[role="tab"]'));
-      }
-
-      function decorateTabs() {
-        const tabs = getTabs();
-        tabs.forEach((tab) => {
-          const rawLabel = (tab.dataset.tabLabel || tab.innerText || "").trim();
-          const labelNormalized = normalizeTabLabel(rawLabel);
-          const displayLabel = DISPLAY_LABELS[labelNormalized] || rawLabel;
-          const iconSvg = TAB_ICONS[labelNormalized];
-          if (!iconSvg || !rawLabel) return;
-
-          const existingBadge = tab.querySelector(".tab-icon-badge");
-          const existingLabel = tab.querySelector(".tab-label-text");
-          if (tab.dataset.tabDecorated === "1" && existingBadge && existingLabel) {
-            existingLabel.textContent = displayLabel;
-            tab.dataset.tabLabel = rawLabel;
-            return;
-          }
-
-          const badge = doc.createElement("span");
-          badge.className = "tab-icon-badge";
-          badge.setAttribute("aria-hidden", "true");
-          badge.innerHTML = iconSvg;
-
-          const label = doc.createElement("span");
-          label.className = "tab-label-text";
-          label.textContent = displayLabel;
-
-          tab.textContent = "";
-          tab.appendChild(badge);
-          tab.appendChild(label);
-          tab.dataset.tabLabel = rawLabel;
-          tab.dataset.tabDecorated = "1";
-        });
-      }
-
-      function bindTabClicks() {
-        const tabs = getTabs();
-        tabs.forEach((tab) => {
-          if (tab.dataset.tabBound === "1") return;
-          tab.dataset.tabBound = "1";
-          tab.addEventListener("click", () => {
-            try {
-              window.sessionStorage.setItem(KEY, normalizeTabLabel(tab.dataset.tabLabel || tab.innerText));
-            } catch (e) {}
-          });
-        });
-      }
-
-      function restoreSavedTab() {
-        let saved = null;
-        try {
-          saved = window.sessionStorage.getItem(KEY);
-        } catch (e) {}
-        if (!saved) return;
-        const savedNormalized = normalizeTabLabel(saved);
-
-        const tabs = getTabs();
-        const target = tabs.find((t) => normalizeTabLabel(t.dataset.tabLabel || t.innerText) === savedNormalized);
-        if (target && target.getAttribute("aria-selected") !== "true") {
-          target.click();
-        }
-      }
-
-      let attempts = 0;
-      const timer = setInterval(() => {
-        decorateTabs();
-        bindTabClicks();
-        restoreSavedTab();
-        attempts += 1;
-        if (attempts > 30) clearInterval(timer);
-      }, 120);
-    })();
-    </script>
-    """,
-    height=0,
+aba_dashboard_ativa = st.radio(
+    "Navegacao principal do dashboard",
+    options=labels_abas_dashboard,
+    index=labels_abas_dashboard.index(_aba_padrao_dashboard),
+    key="dashboard_tab_ativa",
+    horizontal=True,
+    label_visibility="collapsed",
+    format_func=lambda valor: _label_abas_display.get(valor, valor),
 )
+
+tab0 = st.container()
+tab1 = st.container()
+tab3 = st.container()
+tab4 = st.container()
+tab5 = st.container()
+tab2 = st.container()
+
+tab_inicio_ativa = aba_dashboard_ativa == "INICIO"
+tab_ativados_ativa = aba_dashboard_ativa == "ATIVADOS"
+tab_desativacoes_ativa = aba_dashboard_ativa == "DESATIVACOES"
+tab_pedidos_ativa = aba_dashboard_ativa == "PEDIDOS"
+tab_ligacoes_ativa = aba_dashboard_ativa == "LIGACOES"
+tab_funil_movel_ativa = aba_dashboard_ativa == "FUNIL_MOVEL"
 
 st.markdown(
     """
@@ -17925,6 +17883,100 @@ st.markdown(
         color: #2F3747 !important;
         font-weight: 700 !important;
         border-top: 1px solid #E6E6E6 !important;
+    }
+
+    body .tabela-funil-fixa-backlog-fixa-pme-container,
+    body .tabela-funil-movel-cotacoes-valor-mensal-container,
+    body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes {
+        border: 1px solid rgba(121, 14, 9, 0.16) !important;
+        border-radius: 3px !important;
+        box-shadow: none !important;
+        background: #FFFFFF !important;
+        margin: 8px 0 14px 0 !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme,
+    body table.tabela-funil-movel-cotacoes-valor-mensal,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes {
+        border-collapse: collapse !important;
+        border-spacing: 0 !important;
+        background: #FFFFFF !important;
+        box-shadow: none !important;
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme th,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes th {
+        background: #790E09 !important;
+        color: #FFFFFF !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        border-right: 1px solid rgba(255,255,255,0.18) !important;
+        border-bottom: 1px solid rgba(61,7,4,0.82) !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.18px !important;
+        padding: 6px 5px !important;
+        white-space: normal !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme th.col-total-mes,
+    body table.tabela-funil-fixa-backlog-fixa-pme th.col-mes-atual,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th.col-total-mes,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th.col-mes-atual,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes th.col-var,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes th.col-tend {
+        background: #8E241D !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes td {
+        background: #FFFFFF !important;
+        color: #2F3747 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        border-bottom: 1px solid #E8E8E8 !important;
+        border-right: 1px solid #F0F0F0 !important;
+        padding: 5px 5px !important;
+        font-weight: 600 !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:nth-child(even) td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes tbody tr:nth-child(even) td {
+        background: #FAFAFA !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:hover td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:hover td,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes tbody tr:hover td {
+        background: #FFF8F7 !important;
+        transform: none !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme td.col-valor::before,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-valor::before,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes td::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme td.col-canal,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-canal,
+    body #tabela-funil-conta-cotacoes-ativacao table.tabela-funil-cotacoes td.col-etapa {
+        color: #2F3747 !important;
+        font-weight: 800 !important;
+        box-shadow: none !important;
+        text-align: left !important;
+    }
+
+    body table.tabela-funil-fixa-backlog-fixa-pme tr.linha-total td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td {
+        background: #5A0A06 !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        border-color: rgba(255,255,255,0.18) !important;
     }
     </style>
     """,

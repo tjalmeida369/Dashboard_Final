@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import sys
 import unicodedata
 from pathlib import Path
 
@@ -46,13 +45,14 @@ def _resolve_block_order(namespace: dict[str, object]) -> list[str]:
     }
     active_count = sum(active_flags.values())
 
-    # Fallback conservador: se o Streamlit nao expuser a aba ativa, preserva
-    # exatamente o fluxo antigo renderizando todos os blocos.
+    # Fallback Cloud-safe: se a aba ativa nao estiver disponivel, renderiza
+    # somente a capa. Renderizar todos os blocos ao mesmo tempo ultrapassa o
+    # limite de memoria do Streamlit Cloud.
     if active_count == 0 or active_count == len(active_flags):
         blocks_estado = _blocks_por_estado_streamlit()
         if blocks_estado:
             return blocks_estado
-        return list(BLOCK_ORDER)
+        return ['funil_movel', 'funil_movel_final', 'inicio']
 
     selected: list[str] = []
     for flag_name, blocks in ACTIVE_BLOCKS_BY_FLAG:
@@ -62,7 +62,7 @@ def _resolve_block_order(namespace: dict[str, object]) -> list[str]:
             if block_name in BLOCK_ORDER and block_name not in selected:
                 selected.append(block_name)
 
-    return selected or list(BLOCK_ORDER)
+    return selected or ['funil_movel', 'funil_movel_final', 'inicio']
 
 
 def run_dashboard() -> None:
@@ -76,8 +76,4 @@ def run_dashboard() -> None:
     for block_name in _resolve_block_order(namespace):
         module_name = f'dashboard_a9.blocks.{block_name}'
         module = importlib.import_module(module_name)
-        try:
-            module.render(namespace)
-        finally:
-            sys.modules.pop(module_name, None)
-            del module
+        module.render(namespace)
